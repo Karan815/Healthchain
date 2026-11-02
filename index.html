@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S3 Media Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:         #080808;
+      --bg-grid:    rgba(255,255,255,0.022);
+      --surface:    #111111;
+      --surface-2:  #181818;
+      --surface-3:  #202020;
+      --border:     rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --border-hi:  rgba(255,255,255,0.22);
+      --accent:     #c8ff57;
+      --accent-glow:rgba(200,255,87,0.15);
+      --accent-dim: #a8dd40;
+      --blue:       #5b9cf6;
+      --blue-dim:   rgba(91,156,246,0.12);
+      --red:        #ff5252;
+      --red-dim:    rgba(255,82,82,0.1);
+      --green:      #3ddc84;
+      --green-dim:  rgba(61,220,132,0.1);
+      --text:       #f2f2f2;
+      --text-2:     #999;
+      --text-3:     #555;
+      --mono:       'DM Mono', monospace;
+      --serif:      'Instrument Serif', serif;
+      --sans:       'Syne', sans-serif;
+      --r:          8px;
+      --r-lg:       14px;
+      --ease:       0.18s cubic-bezier(0.4,0,0.2,1);
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image:
+        linear-gradient(var(--bg-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+    .shell { max-width: 820px; margin: 0 auto; padding: 52px 24px 96px; }
+
+    /* Header */
+    .header { margin-bottom: 52px; }
+    .header-eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
+    .header h1 { font-family: var(--sans); font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1; color: var(--text); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .header h1 .accent-word { color: var(--accent); font-style: italic; font-family: var(--serif); font-size: 1.08em; }
+    .header-rule { width: 100%; height: 1px; background: var(--border); margin-top: 20px; position: relative; }
+    .header-rule::before { content: ''; position: absolute; left: 0; top: 0; width: 60px; height: 1px; background: var(--accent); }
+
+    /* Section label */
+    .label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    .label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* Cards */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 28px; margin-bottom: 16px; transition: border-color var(--ease); }
+    .card:hover { border-color: var(--border-mid); }
+    .upload-card { margin-bottom: 32px; }
+
+    /* Drop zone */
+    .drop-zone { position: relative; border: 1px dashed var(--border-mid); border-radius: var(--r); padding: 32px; text-align: center; cursor: pointer; transition: border-color var(--ease), background var(--ease); margin-bottom: 20px; }
+    .drop-zone:hover { border-color: var(--accent); background: var(--accent-glow); }
+    .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { width: 44px; height: 44px; margin: 0 auto 12px; border: 1px solid var(--border-hi); border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface-2); transition: border-color var(--ease), background var(--ease); }
+    .drop-zone:hover .drop-icon { border-color: var(--accent); background: var(--accent-glow); }
+    .drop-icon svg { width: 18px; height: 18px; stroke: var(--text-2); }
+    .drop-zone:hover .drop-icon svg { stroke: var(--accent); }
+    .drop-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .drop-sub { font-family: var(--mono); font-size: 10px; color: var(--text-3); letter-spacing: 0.05em; }
+
+    /* File chip */
+    .file-chip { display: none; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border-mid); border-radius: var(--r); padding: 10px 14px; margin-bottom: 16px; font-family: var(--mono); font-size: 11px; color: var(--accent); animation: fadeIn .2s ease; }
+    .file-chip.visible { display: flex; }
+    .file-chip-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-chip-size { color: var(--text-3); flex-shrink: 0; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 7px; font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.01em; border: none; border-radius: var(--r); cursor: pointer; transition: all var(--ease); white-space: nowrap; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+    .btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .btn-primary { background: var(--accent); color: #0a0a0a; padding: 11px 22px; }
+    .btn-primary:hover { background: var(--accent-dim); box-shadow: 0 0 20px var(--accent-glow); }
+    .btn-ghost { background: transparent; color: var(--blue); border: 1px solid rgba(91,156,246,0.25); padding: 7px 13px; }
+    .btn-ghost:hover { background: var(--blue-dim); border-color: var(--blue); }
+    .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(255,82,82,0.2); padding: 7px 13px; }
+    .btn-danger:hover { background: var(--red-dim); border-color: var(--red); }
+
+    /* Status */
+    .status { margin-top: 16px; font-family: var(--mono); font-size: 11px; min-height: 0; }
+    .alert { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: var(--r); animation: fadeIn .2s ease; }
+    .alert-success { background: var(--green-dim); border: 1px solid rgba(61,220,132,0.25); color: var(--green); }
+    .alert-error   { background: var(--red-dim);   border: 1px solid rgba(255,82,82,0.25);  color: var(--red); }
+    .alert-loading { background: var(--surface-2); border: 1px solid var(--border-mid);     color: var(--text-2); }
+
+    /* File list */
+    .file-list-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .file-count { font-family: var(--mono); font-size: 10px; color: var(--text-3); margin-bottom: 4px; letter-spacing: 0.06em; }
+    .file-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; display: flex; align-items: center; gap: 14px; transition: border-color var(--ease), background var(--ease); animation: fadeIn .22s ease; }
+    .file-item:hover { border-color: var(--border-mid); background: var(--surface-2); }
+    .file-badge { width: 38px; height: 38px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
+    .file-badge-img { background: rgba(91,156,246,0.1);  border: 1px solid rgba(91,156,246,0.2); }
+    .file-badge-vid { background: rgba(200,255,87,0.08); border: 1px solid rgba(200,255,87,0.18); }
+    .file-badge-def { background: var(--surface-3); border: 1px solid var(--border); }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+    .meta { display: flex; gap: 12px; flex-wrap: wrap; }
+    .meta-pill { font-family: var(--mono); font-size: 10px; color: var(--text-3); letter-spacing: 0.04em; }
+    .meta-pill + .meta-pill::before { content: '·'; margin-right: 12px; }
+    .file-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* Empty */
+    .empty-state { text-align: center; padding: 56px 24px; border: 1px dashed var(--border); border-radius: var(--r-lg); color: var(--text-3); }
+    .empty-state p { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; }
+
+    /* Spinner */
+    .spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.12); border-top-color: var(--text-2); border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 580px) {
+      .shell { padding: 32px 16px 64px; }
+      .file-item { flex-wrap: wrap; }
+      .file-actions { width: 100%; }
+      .btn-ghost, .btn-danger { flex: 1; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="header">
+    <p class="header-eyebrow">AWS S3 · Media Manager</p>
+    <h1>Your <span class="accent-word">Media</span> Vault</h1>
+    <div class="header-rule"></div>
+  </header>
+
+  <div class="card upload-card">
+    <p class="label">Upload</p>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" onchange="onFileSelect(this)" />
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <p class="drop-title">Choose a file</p>
+      <p class="drop-sub">jpg · png · mp4 · mov &nbsp;|&nbsp; max 50 MB</p>
+    </div>
+
+    <div class="file-chip" id="fileChip">
+      <span>◈</span>
+      <span class="file-chip-name" id="chipName"></span>
+      <span class="file-chip-size" id="chipSize"></span>
+    </div>
+
+    <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Upload to S3
+    </button>
+
+    <div class="status" id="uploadStatus"></div>
+  </div>
+
+  <div class="card">
+    <p class="label">Files</p>
+    <div id="fileList"></div>
+  </div>
+
+</div>
+
+<script>
+  const API_BASE = "http://localhost:3000/api/files";
+
+  window.onload = loadFiles;
+
+  function onFileSelect(input) {
+    const file = input.files[0];
+    const chip = document.getElementById("fileChip");
+    const btn  = document.getElementById("uploadBtn");
+    if (!file) { chip.classList.remove("visible"); btn.disabled = true; return; }
+    document.getElementById("chipName").textContent = file.name;
+    document.getElementById("chipSize").textContent = formatSize(file.size);
+    chip.classList.add("visible");
+    btn.disabled = false;
+  }
+
+  async function uploadFile() {
+    const fileInput = document.getElementById("fileInput");
+    const status    = document.getElementById("uploadStatus");
+    const btn       = document.getElementById("uploadBtn");
+
+    if (!fileInput.files.length) { setStatus(status, "error", "Select a file first"); return; }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    btn.disabled = true;
+    setStatus(status, "loading", "Uploading…");
+
+    try {
+      const res  = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(status, "success", `Uploaded: ${data.data.key}`);
+        fileInput.value = "";
+        document.getElementById("fileChip").classList.remove("visible");
+        btn.disabled = true;
+        loadFiles();
+      } else {
+        setStatus(status, "error", data.error || "Upload failed");
+        btn.disabled = false;
+      }
+    } catch (err) {
+      setStatus(status, "error", "Network error — is the server running?");
+      btn.disabled = false;
+    }
+  }
+
+  async function loadFiles() {
+    const list = document.getElementById("fileList");
+    list.innerHTML = `<div class="alert alert-loading"><span class="spinner"></span> Fetching from S3…</div>`;
+    try {
+      const res  = await fetch(`${API_BASE}/files`);
+      const data = await res.json();
+      const files = data.data || [];
+      if (!files.length) { list.innerHTML = `<div class="empty-state"><p>No files uploaded yet</p></div>`; return; }
+      files.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+      list.innerHTML = `<p class="file-count">${files.length} file${files.length !== 1 ? "s" : ""} in bucket</p>`;
+      const wrap = document.createElement("div");
+      wrap.className = "file-list-wrap";
+      files.forEach(file => {
+        const { icon, cls } = fileIcon(file.key);
+        const item = document.createElement("div");
+        item.className = "file-item";
+        item.id = `item-${CSS.escape(file.key)}`;
+        item.innerHTML = `
+          <div class="file-badge ${cls}">${icon}</div>
+          <div class="file-info">
+            <div class="file-name" title="${escHtml(file.key)}">${escHtml(file.key)}</div>
+            <div class="meta">
+              <span class="meta-pill">${file.sizeMB} MB</span>
+              <span class="meta-pill">${fmtDate(file.lastModified)}</span>
+            </div>
+          </div>
+          <div class="file-actions">
+            <button class="btn btn-ghost" onclick="viewFile('${encodeURIComponent(file.key)}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              View
+            </button>
+            <button class="btn btn-danger" onclick="deleteFile('${encodeURIComponent(file.key)}', this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              Delete
+            </button>
+          </div>`;
+        wrap.appendChild(item);
+      });
+      list.appendChild(wrap);
+    } catch (err) {
+      list.innerHTML = `<div class="alert alert-error">Failed to load files — check your API connection</div>`;
+    }
+  }
+
+  async function viewFile(key) {
+    try {
+      const res  = await fetch(`${API_BASE}/file/${key}`);
+      const data = await res.json();
+      if (data.success) window.open(data.data.url, "_blank");
+    } catch (err) { alert("Could not fetch file URL"); }
+  }
+
+  async function deleteFile(key, btn) {
+    if (!confirm("Delete this file?\nThis cannot be undone.")) return;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span>`;
+    try {
+      const res  = await fetch(`${API_BASE}/file/${key}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        const item = document.getElementById(`item-${CSS.escape(decodeURIComponent(key))}`);
+        if (item) {
+          item.style.transition = "opacity .2s, transform .2s";
+          item.style.opacity    = "0";
+          item.style.transform  = "scale(0.97)";
+          setTimeout(loadFiles, 220);
+        } else { loadFiles(); }
+      } else { alert("Delete failed"); btn.disabled = false; }
+    } catch (err) { alert("Error deleting file"); btn.disabled = false; }
+  }
+
+  function setStatus(el, type, msg) {
+    const map = {
+      success: `<div class="alert alert-success">✓ ${msg}</div>`,
+      error:   `<div class="alert alert-error">✕ ${msg}</div>`,
+      loading: `<div class="alert alert-loading"><span class="spinner"></span> ${msg}</div>`,
+    };
+    el.innerHTML = map[type] || "";
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024*1024) return `${(bytes/1024).toFixed(1)} KB`;
+    return `${(bytes/(1024*1024)).toFixed(2)} MB`;
+  }
+
+  function fmtDate(str) {
+    if (!str) return "—";
+    return new Date(str).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  }
+
+  function fileIcon(key) {
+    const ext = key.split(".").pop().toLowerCase();
+    if (["jpg","jpeg","png","gif","webp","avif","svg"].includes(ext)) return { icon:"🖼", cls:"file-badge-img" };
+    if (["mp4","mov","avi","webm","mkv"].includes(ext))               return { icon:"🎬", cls:"file-badge-vid" };
+    return { icon:"📄", cls:"file-badge-def" };
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+</script>
+</body>
+</html>
